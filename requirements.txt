@@ -1,0 +1,14 @@
+pandas
+matplotlib
+seaborn
+numpy
+nltk
+sklearn
+collections
+re
+sklearn
+string
+keras
+tqdm
+pyspellchecker
+gensim
