@@ -5,7 +5,7 @@ import numpy as np
 import nltk
 from nltk.corpus import stopwords
 from nltk.util import ngrams
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from collections import defaultdict
 from collections import  Counter
 plt.style.use('ggplot')
@@ -17,6 +17,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.metrics import f1_score
+from sklearn.decomposition import TruncatedSVD
+import matplotlib
+import matplotlib.patches as mpatches
 
 import string
 import keras
@@ -102,4 +105,41 @@ sns.barplot(x=y,y=x)
 #since most of the common words are stop words - a lot of cleaning is required
 
 
+#visualization of tf-idf and word2vec
+X_train, X_test, y_train, y_test = train_test_split(tweet["text"], tweet["target"], test_size=0.2, random_state=2022)
 
+#plotting using latent sentiment analysis - This transformer performs linear dimensionality reduction by means of truncated singular value decomposition
+def plot_LSA(test_data, test_labels, plot=True):
+    lsa = TruncatedSVD(n_components=2)
+    lsa.fit(test_data)
+    lsa_scores = lsa.transform(test_data)
+    color_mapper = {label: idx for idx, label in enumerate(set(test_labels))}
+    color_column = [color_mapper[label] for label in test_labels]
+    colors = ['orange', 'blue', 'blue']
+    if plot:
+        plt.scatter(lsa_scores[:, 0], lsa_scores[:, 1], s=8, alpha=.8, c=test_labels,
+                    cmap=matplotlib.colors.ListedColormap(colors))
+        red_patch = mpatches.Patch(color='orange', label='Irrelevant')
+        green_patch = mpatches.Patch(color='blue', label='Disaster')
+        plt.legend(handles=[red_patch, green_patch], prop={'size': 30})
+
+
+#plotting tfidf
+def tfidf(data):
+    tfidf_vectorizer = TfidfVectorizer()
+
+    train = tfidf_vectorizer.fit_transform(data)
+
+    return train, tfidf_vectorizer
+
+X_train_tfidf, tfidf_vectorizer = tfidf(X_train)
+X_test_tfidf = tfidf_vectorizer.transform(X_test)
+
+fig = plt.figure(figsize=(16, 16))
+plot_LSA(X_train_tfidf, y_train)
+plt.show()
+
+#plotting word2vec
+#fig = plt.figure(figsize=(16, 16))
+#plot_LSA(embeddings, list_labels)
+#plt.show()
