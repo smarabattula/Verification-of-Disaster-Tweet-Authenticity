@@ -68,6 +68,14 @@ def create_corpus(target):
             corpus.append(i)
     return corpus
 
+corpus_merged=create_corpus(1)
+corpus_merged.extend(create_corpus(0))
+wc = WordCloud(background_color='black')
+wc.generate(' '.join(corpus_merged))
+plt.imshow(wc, interpolation="bilinear")
+plt.axis('off')
+plt.show()
+
 corpus = create_corpus(0)
 corpus.extend(create_corpus(1))
 
