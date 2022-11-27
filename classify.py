@@ -262,6 +262,29 @@ for model in models:
 
 
 #lstm
+"""
+
+vocab_len = max([len(i) for i in tweet["tokens"]])
+
+X_train_word2vec1, X_test_word2vec1, y_train_word2vec1, y_test_word2vec1 = train_test_split(tweet['tokens'], list_labels,
+                                                                                        test_size=0.2, random_state=2022)
+
+emb = [s for s in X_train_word2vec1]
+emb.extend(s for s in X_test_word2vec1)
+w2v =  gensim.models.Word2Vec(
+    emb, 
+    min_count=2,
+    workers=4, 
+    window =5
+)
+
+
+def get_word2vec_embeddings1(vectors, clean_questions, generate_missing=False):
+    embeddings = [get_average_word2vec(x, vectors, generate_missing=generate_missing) for x in clean_questions]
+    return list(embeddings)
+
+embeddings1 = get_word2vec_embeddings1(word2vec, X_train_word2vec1)
+embeddingstest = get_word2vec_embeddings1(word2vec, X_test_word2vec1)
 
 def BiDirLSTM(vocSize, inpShape, seeds = 2022):
     np.random.seed(seeds)
@@ -336,4 +359,17 @@ history = model.fit(
     verbose = 1,
     #callbacks = [reduce_lr, checkpoint]
 )
+"""
 
+embed_dim = 32
+lstm_out = 32
+model = Sequential()
+model.add(Embedding(max_features, embed_dim,input_length = X.shape[1]))
+model.add(Dropout(0.2))
+model.add(LSTM(lstm_out, dropout=0.2, recurrent_dropout=0.4))
+model.add(Dense(1,activation='sigmoid'))
+adam = Adam(learning_rate=0.002)
+model.compile(loss = 'binary_crossentropy', optimizer=adam ,metrics = ['accuracy'])
+print(model.summary())
+
+model.fit(np.array(X_train_word2vec1), np.array(y_train_word2vec1), epochs = 10, batch_size=32, validation_data=(np.array(X_test_word2vec1), np.array(y_test_word2vec1)))
