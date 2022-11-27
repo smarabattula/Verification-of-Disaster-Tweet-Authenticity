@@ -1,3 +1,9 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import nltk
+import copy
 from nltk.corpus import stopwords
 from nltk.util import ngrams
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -16,16 +22,30 @@ from sklearn.metrics import f1_score
 from sklearn.decomposition import TruncatedSVD
 import matplotlib
 import matplotlib.patches as mpatches
-
+from wordcloud import WordCloud
+from itertools import chain
 import string
 import keras
+import xgboost as xgb
+from sklearn.metrics import accuracy_score
+
+
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
 from tqdm import tqdm
 from keras.models import Sequential
 from keras.initializers import Constant
-from keras.optimizers import Adam
+from keras.optimizers import Adam, Adamax
+
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.losses import BinaryCrossentropy, SparseCategoricalCrossentropy
+from tensorflow.keras.layers import Input, LSTM, Embedding, Dropout, Bidirectional, Dense
+from tensorflow.keras import Model
+from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
+
 from spellchecker import SpellChecker
 import gensim
+from tensorflow.random import set_seed
 
 tweet=pd.read_csv(r"C:\Users\sasan\OneDrive\Desktop\Fall 2022 Folder\ALDA\Project\train.csv")
 tweet = tweet.drop(columns=['id'])
@@ -210,7 +230,26 @@ SVClassifier.fit(X_train_word2vec,y_train_word2vec)
 
 print("SVClassifier model run successfully")
 
-models = [logistic_reg, SVClassifier]
+#XGBoost
+train = xgb.DMatrix(X_train_word2vec, label = y_train_word2vec)
+test = xgb.DMatrix(X_test_word2vec, label = y_test_word2vec)
+param = {
+        'max_depth': 4,
+        'eta': 0.2,
+        'objective': 'multi:softmax',
+        'num_class':2}
+epochs = 750
+xgmodel = xgb.train(param, train, epochs)
+
+predictions = model.predict(train)
+xgb_acc_train = accuracy_score(y_train_word2vec,predictions)
+
+predictions = model.predict(test)
+xgb_acc_test = accuracy_score(y_test_word2vec,predictions)
+
+print('XGboost train accuracy:', xgb_acc_train)
+print('XGboost test accuracy:', xgb_acc_test)
+print('XGboost test f1score:', f1_score(y_test_word2vec,predictions))
 
 models = [logistic_reg, SVClassifier]
 
