@@ -259,3 +259,81 @@ for model in models:
     y_pred_word2vec = model.predict(X_test_word2vec)
     print(type(model).__name__,'F1 Score is      : ' ,f1_score(y_test_word2vec,y_pred_word2vec))
     print('**************************************************************')
+
+
+#lstm
+
+def BiDirLSTM(vocSize, inpShape, seeds = 2022):
+    np.random.seed(seeds)
+    set_seed(seeds)
+    inp = Input(shape = (inpShape), name = "input")
+    emb = Embedding(
+        input_dim = vocSize,
+        output_dim = 4
+    )(inp)
+    drop = Dropout(0.4)(emb)#0.3
+    biLstm = Bidirectional(
+        LSTM(
+            units=16,#16
+            activation='tanh',
+            return_sequences = True,
+            stateful=False,
+            recurrent_dropout = 0.4,
+            dropout=0.4
+        )
+    )(drop)
+    biLstm = Bidirectional(
+        LSTM(
+            units = 8,
+            activation ='tanh',
+            return_sequences = False,
+            stateful = False,
+            recurrent_dropout = 0.3,#0.3
+            dropout = 0.3
+        )
+    )(biLstm)
+
+    out = Dense(units = 1, activation = "sigmoid")(biLstm)
+
+    m = Model(inputs = inp, outputs = out)
+    m.summary()
+    return m
+
+checkpoint = ModelCheckpoint(
+    'model.h5', 
+    monitor = 'val_loss', 
+    verbose = 1, 
+    save_best_only = True
+)
+reduce_lr = ReduceLROnPlateau(
+    monitor = 'val_loss', 
+    factor = 0.2, 
+    verbose = 1, 
+    patience = 5,                        
+    min_lr = 0.001
+)
+
+model = BiDirLSTM(vocab_len, 300)
+optimizer = Adamax(
+    lr=0.015, 
+    decay=0.0002, 
+    clipvalue=10
+)
+loss = BinaryCrossentropy(label_smoothing=0.01)
+
+model.compile(
+    optimizer = optimizer, 
+    loss = loss, 
+    metrics = ["accuracy"]
+)
+history = model.fit(
+    x = np.asarray(embeddings1), 
+    y = np.asarray(y_train_word2vec1),
+    validation_data = (np.asarray(embeddingstest), np.asarray(y_test_word2vec1)),
+    epochs = 7, 
+    batch_size = 96, 
+    shuffle = True,
+    verbose = 1,
+    #callbacks = [reduce_lr, checkpoint]
+)
+
