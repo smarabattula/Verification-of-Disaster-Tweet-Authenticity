@@ -295,7 +295,59 @@ for model in models:
     f1_sc.append(f1_score(y_test_word2vec,y_pred_word2vec))
     print('**************************************************************')
 
-#XGBoost
+from sklearn.model_selection import GridSearchCV
+param_grid = {
+    "max_depth": [3, 4, 5, 7],
+    "learning_rate": [0.1, 0.15, 0.2],
+    "gamma": [0, 0.25, 1],
+    "reg_lambda": [0, 1, 10],
+    "subsample": [0.8],
+    "colsample_bytree": [0.5],   
+}
+
+# Init classifier
+xgb_cl = xgb.XGBClassifier(objective= "multi:softmax", num_class = 2)
+
+# Init Grid Search
+grid_cv = GridSearchCV(xgb_cl, param_grid, n_jobs=-1, cv=6, scoring="roc_auc")
+
+# Fit
+grid_cv.fit(X_train_word2vec, y_train_word2vec)
+
+grid_cv.best_score_
+
+model = xgb.XGBClassifier(
+    **grid_cv.best_params_,
+    objective="multi:softmax",
+    num_class = 2
+)
+
+model.fit(X_train_word2vec, y_train_word2vec)
+
+predictions = model.predict(X_test_word2vec)
+
+a= precision_score(y_test_word2vec,predictions)
+b=recall_score(y_test_word2vec,predictions)
+c=f1_score(y_test_word2vec,predictions)
+d=accuracy_score(y_test_word2vec,predictions)
+e=grid_cv.best_score_
+
+print('XGboost Train Score is: ',e)
+train_sc.append(float(e))
+
+print('XGboost Test Score is: ',d )
+test_sc.append(float(d))
+
+print('XGboost Precision is      : ', a)   
+print('XGboost Recall is         : ' ,b)  
+print('XGboost F1 Score is       : ' ,c)
+
+precision_sc.append(a)
+recall_sc.append(b)
+f1_sc.append(c)
+
+'''
+#XGBoost Approach 1
 train = xgb.DMatrix(X_train_word2vec, label = y_train_word2vec)
 test = xgb.DMatrix(X_test_word2vec, label = y_test_word2vec)
 param = {
@@ -333,7 +385,7 @@ print('XGboost F1 Score is       : ' ,c)
 precision_sc.append(precision_score(y_test_word2vec,predictions))
 recall_sc.append(recall_score(y_test_word2vec,predictions))
 f1_sc.append(f1_score(y_test_word2vec,predictions))
-
+'''
 #print('train scores',train_scores)
 #print('test scores',test_scores)
 
@@ -367,8 +419,8 @@ for model in models:
     scores = cross_val_score(model, embeddings, list_labels, scoring='accuracy', cv=cv, n_jobs=-1)
     # report performance
     print(type(model).__name__,' 6-fold cross validation accuracy: %.3f ' % (mean(scores)))
-print('XGBoost 6-fold cross validation accuracy: 0.818 ',xgb_acc)
-print('LSTM 6-fold cross validation accuracy: 0.751',lstm_acc)
+#print('XGBoost 6-fold cross validation accuracy: 0.818 ',xgb_acc)
+#print('LSTM 6-fold cross validation accuracy: 0.751',lstm_acc)
 
 #lstm
 """
