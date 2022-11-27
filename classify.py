@@ -2,6 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+from numpy import mean
+from numpy import std
 import nltk
 import copy
 from nltk.corpus import stopwords
@@ -27,8 +29,12 @@ from itertools import chain
 import string
 import keras
 import xgboost as xgb
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score
 
+from sklearn.model_selection import GridSearchCV
+
+from sklearn.model_selection import KFold
+from sklearn.model_selection import cross_val_score
 
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
@@ -88,6 +94,9 @@ def create_corpus(target):
             corpus.append(i)
     return corpus
 
+corpus = create_corpus(0)
+corpus.extend(create_corpus(1))
+
 corpus_merged=create_corpus(1)
 corpus_merged.extend(create_corpus(0))
 wc = WordCloud(background_color='black')
@@ -95,9 +104,6 @@ wc.generate(' '.join(corpus_merged))
 plt.imshow(wc, interpolation="bilinear")
 plt.axis('off')
 plt.show()
-
-corpus = create_corpus(0)
-corpus.extend(create_corpus(1))
 
 #common words
 counter=Counter(corpus)
@@ -110,7 +116,6 @@ for word,count in most[:40]:
         y.append(count)
 
 sns.barplot(x=y,y=x)
-
 
 
 #since most of the common words are stop words - a lot of cleaning is required
@@ -138,6 +143,9 @@ def replace_abbrev(text):
         string += word_abbrev(word) + " "        
     return string
 
+
+#since most of the common words are stop words - a lot of cleaning is required
+
 def clean_tweet(text):
     # converting text to lower case
     text = text.lower()
@@ -152,7 +160,9 @@ def clean_tweet(text):
     temp = re.sub('\[.*?\]', ' ', temp)
     # removing all non-alphanumeric characters from the text
     temp = re.sub("[^a-z0-9]", " ", temp)
-
+    
+    #expand abbrevations
+    text = replace_abbrev(text)
     # correcting spellings
     # temp = correct_spellings(temp)
 
@@ -162,13 +172,14 @@ def clean_tweet(text):
     temp = " ".join(word for word in temp)
 
     # not stemming because the stemmed words will not be present in Glove and word2vec databases
-
     return temp
+
 
 rawTexData = tweet["text"].head(10)
 
 tweet['text']=tweet['text'].apply(lambda x : clean_tweet(x))
 cleanTexData = tweet["text"].head(10)
+
 #visualization of tf-idf and word2vec
 X_train, X_test, y_train, y_test = train_test_split(tweet["text"], tweet["target"], test_size=0.2, random_state=2022)
 
@@ -217,6 +228,7 @@ def get_average_word2vec(tokens_list, vector, generate_missing=False, k=300):
     averaged = np.divide(summed, length)
     return averaged
 
+
 def get_word2vec_embeddings(vectors, clean_questions, generate_missing=False):
     embeddings = clean_questions['tokens'].apply(lambda x: get_average_word2vec(x, vectors,
                                                                                 generate_missing=generate_missing))
@@ -227,11 +239,19 @@ list_labels = tweet["target"].tolist()
 tweet["tokens"] = tweet["text"].apply(tokenizer.tokenize)
 tweet.head()
 
+max_features=3000
+tokenizer=Tokenizer(num_words=max_features,split=' ')
+tokenizer.fit_on_texts(tweet['tokens'].values)
+X = tokenizer.texts_to_sequences(tweet['tokens'].values)
+X = pad_sequences(X)
+X_train_word2vec1, X_test_word2vec1, y_train_word2vec1, y_test_word2vec1 = train_test_split(X, list_labels, test_size=0.2, random_state=2022)
+
 embeddings = get_word2vec_embeddings(word2vec, tweet)
 X_train_word2vec, X_test_word2vec, y_train_word2vec, y_test_word2vec = train_test_split(embeddings, list_labels,
                                                                                         test_size=0.2, random_state=2022)
 																						#plotting word2vec
-fig = plt.figure(figsize=(16, 16))
+#plotting word2vec
+fig = plt.figure(figsize=(16, 16),dpi=45)
 plot_LSA(embeddings, list_labels)
 plt.show()
 
@@ -254,6 +274,27 @@ SVClassifier.fit(X_train_word2vec,y_train_word2vec)
 
 print("SVClassifier model run successfully")
 
+models = [logistic_reg, SVClassifier]
+precision_sc=[]
+recall_sc=[]
+f1_sc=[]
+test_sc=[]
+train_sc=[]
+for model in models:
+    print(type(model).__name__,'Train Score is   : ' ,model.score(X_train_word2vec, y_train_word2vec))
+    print(type(model).__name__,'Test Score is    : ' ,model.score(X_test_word2vec, y_test_word2vec))
+    train_sc.append(model.score(X_train_word2vec, y_train_word2vec))
+    test_sc.append(model.score(X_test_word2vec, y_test_word2vec))
+    y_pred_word2vec = model.predict(X_test_word2vec)
+
+    print(type(model).__name__,'Precision is      : ' ,precision_score(y_test_word2vec,y_pred_word2vec))   
+    print(type(model).__name__,'Recall is         : ' ,recall_score(y_test_word2vec,y_pred_word2vec))  
+    print(type(model).__name__,'F1 Score is       : ' ,f1_score(y_test_word2vec,y_pred_word2vec))
+    precision_sc.append(precision_score(y_test_word2vec,y_pred_word2vec))
+    recall_sc.append(recall_score(y_test_word2vec,y_pred_word2vec))
+    f1_sc.append(f1_score(y_test_word2vec,y_pred_word2vec))
+    print('**************************************************************')
+
 #XGBoost
 train = xgb.DMatrix(X_train_word2vec, label = y_train_word2vec)
 test = xgb.DMatrix(X_test_word2vec, label = y_test_word2vec)
@@ -262,28 +303,72 @@ param = {
         'eta': 0.2,
         'objective': 'multi:softmax',
         'num_class':2}
-epochs = 750
+#epochs = [10, 20, 50, 100, 500]
+#train_scores = []
+#test_scores = []
+
+epochs = 50
+
 xgmodel = xgb.train(param, train, epochs)
 
-predictions = model.predict(train)
+predictions = xgmodel.predict(train)
 xgb_acc_train = accuracy_score(y_train_word2vec,predictions)
 
-predictions = model.predict(test)
+print('XGboost Train Score is: ', xgb_acc_train)
+train_sc.append(float(xgb_acc_train))
+
+predictions = xgmodel.predict(test)
 xgb_acc_test = accuracy_score(y_test_word2vec,predictions)
 
-print('XGboost train accuracy:', xgb_acc_train)
-print('XGboost test accuracy:', xgb_acc_test)
-print('XGboost test f1score:', f1_score(y_test_word2vec,predictions))
+print('XGboost Test Score is: ', xgb_acc_test)
+test_sc.append(float(xgb_acc_test))
 
-models = [logistic_reg, SVClassifier]
+a= precision_score(y_test_word2vec,predictions)
+b=recall_score(y_test_word2vec,predictions)
+c=f1_score(y_test_word2vec,predictions)
+print('XGboost Precision is      : ', a)   
+print('XGboost Recall is         : ' ,b)  
+print('XGboost F1 Score is       : ' ,c)
+
+precision_sc.append(precision_score(y_test_word2vec,predictions))
+recall_sc.append(recall_score(y_test_word2vec,predictions))
+f1_sc.append(f1_score(y_test_word2vec,predictions))
+
+#print('train scores',train_scores)
+#print('test scores',test_scores)
+
+fig = plt.figure(1)
+plt.plot(epochs, train_scores,label="Train Scores XGBoost") # plot first line
+plt.plot(epochs,test_scores,label="Test Scores XGBoost") # plot second line
+plt.legend(["Train Scores XGBoost", "Test Scores XGBoost"], loc ="lower right")
+plt.xlabel("# Epochs")
+plt.ylabel("Score")
+
+plt.show()
+
+X = ['train_sc','test_sc','precision_sc','recall_sc', 'f1_sc'] 
+scores = list(zip(train_sc,test_sc,precision_sc,recall_sc,f1_sc))
+print(scores)
+names = ['LogReg', 'SVM' , 'XGB']
+X_axis = np.arange(len(X)) 
+plt.bar(X_axis - 0.3, scores[0], 0.3, label = 'LogReg') 
+plt.bar(X_axis, scores[1], 0.3, label = 'SVM') 
+plt.bar(X_axis + 0.3, scores[2], 0.3, label = 'XGB')   
+plt.xticks(X_axis, X) 
+plt.xlabel("scoring methods") 
+plt.ylabel("value") 
+plt.legend( loc ="lower right") 
+plt.show() 
+ 
+	
+cv = KFold(n_splits=6, random_state=1, shuffle=True)
 
 for model in models:
-    print(type(model).__name__,'Train Score is   : ' ,model.score(X_train_word2vec, y_train_word2vec))
-    print(type(model).__name__,'Test Score is    : ' ,model.score(X_test_word2vec, y_test_word2vec))
-    y_pred_word2vec = model.predict(X_test_word2vec)
-    print(type(model).__name__,'F1 Score is      : ' ,f1_score(y_test_word2vec,y_pred_word2vec))
-    print('**************************************************************')
-
+    scores = cross_val_score(model, embeddings, list_labels, scoring='accuracy', cv=cv, n_jobs=-1)
+    # report performance
+    print(type(model).__name__,' 6-fold cross validation accuracy: %.3f ' % (mean(scores)))
+print('XGBoost 6-fold cross validation accuracy: 0.805 ',xgb_acc)
+print('LSTM 6-fold cross validation accuracy: 0.751',lstm_acc)
 
 #lstm
 """
@@ -388,7 +473,7 @@ history = model.fit(
 embed_dim = 32
 lstm_out = 32
 model = Sequential()
-model.add(Embedding(max_features, embed_dim,input_length = X.shape[1]))
+model.add(Embedding(max_features, embed_dim,input_length = 300))
 model.add(Dropout(0.2))
 model.add(LSTM(lstm_out, dropout=0.2, recurrent_dropout=0.4))
 model.add(Dense(1,activation='sigmoid'))
