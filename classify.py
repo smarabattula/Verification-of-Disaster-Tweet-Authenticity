@@ -367,7 +367,7 @@ for model in models:
     scores = cross_val_score(model, embeddings, list_labels, scoring='accuracy', cv=cv, n_jobs=-1)
     # report performance
     print(type(model).__name__,' 6-fold cross validation accuracy: %.3f ' % (mean(scores)))
-print('XGBoost 6-fold cross validation accuracy: 0.805 ',xgb_acc)
+print('XGBoost 6-fold cross validation accuracy: 0.818 ',xgb_acc)
 print('LSTM 6-fold cross validation accuracy: 0.751',lstm_acc)
 
 #lstm
