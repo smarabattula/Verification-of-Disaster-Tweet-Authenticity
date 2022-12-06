@@ -12,3 +12,8 @@ keras
 tqdm
 pyspellchecker
 gensim
+copy
+wordcloud
+itertools
+xgboost
+tensorflow
