@@ -1,6 +1,8 @@
 ## Analysis of Disaster Tweets' Authenticity
 # engr-ALDA-Fall2022-P39
 
+Please refer to `Project Final.ipynb` notebook for the project details. It has all the outputs displayed in it.
+
 Steps to run the project:
 
   1. git clone https://github.com/smarabattula/ALDA_Project.git into your local
